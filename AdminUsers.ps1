@@ -46,6 +46,20 @@ foreach ($entry in $entries) {
         }
         Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/v1.0/groups/$groupId/members/\$ref" -Body (ConvertTo-Json $addMemberBody)
         Write-Host "Gerät hinzugefügt: $deviceId"
+
+        #Gerät zu weiterer Gruppe hinzufügen
+        $exGroupID = (Get-MgGroup -Filter "displayName eq 'DG_WIN_IN_ADM-DevicesWithLocalAdmin'").id
+        $exGroupMembers= Get-MgGroupMember -GroupId $exGroupID
+        If ($exGroupMembers -notcontains $deviceId) {
+            $addExMemberBody = @{
+                "@odata.id" = "https://graph.microsoft.com/v1.0/devices/$deviceId"
+            }
+            Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/v1.0/groups/$exGroupID/members/\$ref" -Body (ConvertTo-Json $addExMemberBody)
+            Write-Host "Gerät hinzugefügt: $deviceId"
+        }
+        Else {
+            Write-Host "Gerät ist bereits in der Gruppe $exGroupID."
+        }   
     }
 
     # Endpoint Security Account Protection Policy erstellen
