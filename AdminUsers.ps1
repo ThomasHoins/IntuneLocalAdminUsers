@@ -1,9 +1,9 @@
-﻿$csvPath = "C:\Temp\ADminUsers.csv"
+$csvPath = "C:\Temp\ADminUsers1.csv"
 $domain = "ECE"
 $RDPGRPSID=(Get-MgGroup -Filter "displayName eq 'UG_WIN_IN_RDPUsers'").SecurityIdentifier
 
 # Graph verbinden
-Connect-MgGraph -Scopes Device.Read.All, Group.ReadWrite.All, DeviceManagementConfiguration.ReadWrite.All, Directory.Read.All
+#Connect-MgGraph -Scopes Device.Read.All, Group.ReadWrite.All, DeviceManagementConfiguration.ReadWrite.All, Directory.Read.All
 
 # CSV einlesen
 $entries = Import-Csv -Path $csvPath -Delimiter ";"
@@ -12,6 +12,18 @@ foreach ($entry in $entries) {
     $user = $entry.SAMAccountName
     $computer = $entry.ComputerName
     $groupName = "DG_WIN_IN_ADM-$computer"
+    $device = ""
+    $groups = ""
+    $deviceId = ""
+    $groupId = ""
+    $exGroupID = ""
+    $exGroupMembers= ""
+    $policys = ""
+    $policyBody = ""
+    $policy = ""
+    $policyId = ""
+    $assignmentBody = ""
+
 
     # Gruppe erstellen
     $groupBody = @{
@@ -24,7 +36,7 @@ foreach ($entry in $entries) {
 
 
     # Gerät suchen
-    $device = Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/devices?\$filter=displayName eq '$computer'" -ErrorAction SilentlyContinue
+    $device = Invoke-MgGraphRequest -Method GET -Uri "https://graph.microsoft.com/v1.0/devices?`$filter=displayName eq '$computer'" -ErrorAction SilentlyContinue
     if ($device.value.Count -eq 0) {
         Write-Warning "Gerät '$computer' nicht gefunden."
         continue #Nächster Wert, falls es das Gerät nicht gibt.
@@ -44,7 +56,7 @@ foreach ($entry in $entries) {
         $addMemberBody = @{
             "@odata.id" = "https://graph.microsoft.com/v1.0/devices/$deviceId"
         }
-        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/v1.0/groups/$groupId/members/\$ref" -Body (ConvertTo-Json $addMemberBody)
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/v1.0/groups/$groupId/members/`$ref" -Body (ConvertTo-Json $addMemberBody)
         Write-Host "Gerät hinzugefügt: $deviceId"
 
         #Gerät zu weiterer Gruppe hinzufügen
@@ -54,7 +66,7 @@ foreach ($entry in $entries) {
             $addExMemberBody = @{
                 "@odata.id" = "https://graph.microsoft.com/v1.0/devices/$deviceId"
             }
-            Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/v1.0/groups/$exGroupID/members/\$ref" -Body (ConvertTo-Json $addExMemberBody)
+            Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/v1.0/groups/$exGroupID/members/`$ref" -Body (ConvertTo-Json $addExMemberBody)
             Write-Host "Gerät hinzugefügt: $deviceId"
         }
         Else {
@@ -214,18 +226,17 @@ foreach ($entry in $entries) {
     Write-Host "Policy ""WIN_AP_ADM-$computer"" erstellt: $policyId"
 
     
-    # Policy zuweisen
-    $assignmentBody = @{
-        assignments = @(@{
+    # Policy zuweisen
+    $assignmentBody = @{
+        assignments = @(@{
             target = @{
                 "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
                  groupId = $groupId
-            }
-        })
-    }
+            }
+        })
+    }
 
-    Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/configurationPolicies/$policyId/assign" -Headers $headers -Body ( ConvertTo-Json $assignmentBody -Depth 5)
-    Write-Host "Policy für $user auf $computer erstellt und zugewiesen."
+    Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/configurationPolicies/$policyId/assign" -Headers $headers -Body ( ConvertTo-Json $assignmentBody -Depth 5)
+    Write-Host "Policy für $user auf $computer erstellt und zugewiesen."
 
 } #Foreach Ende
-
